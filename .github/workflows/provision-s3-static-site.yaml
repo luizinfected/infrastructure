@@ -19,19 +19,37 @@ jobs:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: sa-east-1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
           
       - name: Extract Bucket Name from Issue
         run: |
-          export BUCKET_NAME=$(echo "${{ github.event.issue.title }}")
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          BUCKET_NAME=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -s ' ' '-' | tr -cd 'a-z0-9-')
+
+          if [[ -z "$BUCKET_NAME" ]]; then
+            echo "Erro: Nome do bucket está vazio! Verifique o título da issue."
+            exit 1
+          fi
+
           echo "Bucket Name: $BUCKET_NAME"
-          echo "Bucket_Name=$BUCKET_NAME" >> $GITHUB_ENV
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
+
+      - name: Debug Bucket Name
+        run: |
+          echo "Bucket Name: $BUCKET_NAME"
+
+
           
       - name: Run Terraform
         run: |
           cd terraform 
-          cd s3-static-site
+          cd s3-bucket-static
           terraform init 
-          terraform apply -auto-approve -var="bucket_name={{env.BUCKET_NAME}}"
+          terraform apply -auto-approve -var="bucket_name=$BUCKET_NAME"
+
+
           
       - name: Add coment
         run: gh issue comment "$NUMBER" --repo "$REPO" --body "$BODY"
